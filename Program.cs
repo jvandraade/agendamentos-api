@@ -45,7 +45,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("ApiCorsPolicy", policy =>
         policy.WithOrigins(
                 "https://localhost:3000",
-                "https://agendamentos-app-nu.vercel.app/",
+                "https://agendamentos-app-nu.vercel.app",
                 "https://*.vercel.app"
             )
               .AllowAnyMethod()
