@@ -1,4 +1,4 @@
-using AgendamentosApi.Data;
+﻿using AgendamentosApi.Data;
 using AgendamentosApi.Middleware;
 using AgendamentosApi.Validators;
 using FluentValidation;
@@ -9,6 +9,7 @@ using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
+
 builder.Host.UseSerilog((context, config) =>
 {
     config
@@ -18,36 +19,39 @@ builder.Host.UseSerilog((context, config) =>
         .WriteTo.File("logs/log-.txt", rollingInterval: RollingInterval.Day);
 });
 
+
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8081";
-builder.WebHost.UseUrls($"http://*:{port}");
+builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+
+
+var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+var connectionString = !string.IsNullOrEmpty(databaseUrl)
+    ? databaseUrl
+    : builder.Configuration.GetConnectionString("DefaultConnection");
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
+        connectionString,
         npgsqlOptions => npgsqlOptions.EnableRetryOnFailure(
             maxRetryCount: 5,
             maxRetryDelay: TimeSpan.FromSeconds(30),
             errorCodesToAdd: null)));
 
 builder.Services.AddControllers();
-
-
 builder.Services.AddValidatorsFromAssemblyContaining<RegistrarAgendamentoValidator>();
-
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
-var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-    ?? new[] { "http://localhost:3000" };
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("ApiCorsPolicy", policy =>
+    options.AddPolicy("AllowFrontend", policy =>
         policy.WithOrigins(
-                "https://localhost:3000",
-                "https://agendamentos-app-nu.vercel.app",
-                "https://*.vercel.app"
+                "http://localhost:3000",                     
+                "https://agendamentos-app-nu.vercel.app",   
+                "https://*.vercel.app"                       
             )
+              .SetIsOriginAllowedToAllowWildcardSubdomains() 
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials());
@@ -60,10 +64,10 @@ builder.Services.AddSwaggerGen(options =>
     {
         Title = "API de Agendamentos",
         Version = "v1",
-        Description = "API para gerenciamento de agendamentos de servi�os",
+        Description = "API para gerenciamento de agendamentos de serviços",
         Contact = new OpenApiContact
         {
-            Name = "Jo�o Vitor Andrade",
+            Name = "João Vitor Andrade",
             Email = "jvandraadetech@gmail.com"
         }
     });
@@ -79,20 +83,19 @@ builder.Services.AddSwaggerGen(options =>
 var app = builder.Build();
 
 app.UseSerilogRequestLogging();
-
 app.UseExceptionHandler();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "API de Agendamentos v1");
-        c.RoutePrefix = string.Empty;
-    });
-}
 
-app.UseCors("AlowFrontend");
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "API de Agendamentos v1");
+    c.RoutePrefix = "swagger"; 
+});
+
+
+app.UseCors("AllowFrontend");
+
 
 if (!app.Environment.IsProduction())
 {
@@ -102,12 +105,18 @@ if (!app.Environment.IsProduction())
 app.UseAuthorization();
 app.MapControllers();
 
-if (app.Environment.IsDevelopment())
+
+using (var scope = app.Services.CreateScope())
 {
-    using (var scope = app.Services.CreateScope())
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    try
     {
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await dbContext.Database.MigrateAsync();
+        Console.WriteLine("✅ Migrations aplicadas com sucesso!");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Erro ao aplicar migrations: {ex.Message}");
     }
 }
 
