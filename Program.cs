@@ -92,7 +92,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseCors("ApiCorsPolicy");
+app.UseCors("AlowFrontend");
 
 if (!app.Environment.IsProduction())
 {
