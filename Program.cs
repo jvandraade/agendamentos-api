@@ -43,7 +43,11 @@ var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("ApiCorsPolicy", policy =>
-        policy.WithOrigins(allowedOrigins)
+        policy.WithOrigins(
+                "https://localhost:3000",
+                "https://agendamentos-app-nu.vercel.app/",
+                "https://*.vercel.app"
+            )
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials());
