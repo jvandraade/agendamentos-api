@@ -1,0 +1,6 @@
+@AgendamentosApi_HostAddress = http://localhost:5207
+
+GET {{AgendamentosApi_HostAddress}}/
+Accept: application/json
+
+###
