@@ -10,7 +10,7 @@ API RESTful que permite criar, listar e excluir agendamentos. Utiliza SQLite com
 
 - ASP.NET Core 8.0
 - Entity Framework Core
-- SQLite
+- PostgreSQL
 - Swagger/OpenAPI
 
 ## Funcionalidades
