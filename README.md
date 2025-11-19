@@ -151,7 +151,10 @@ Tabela: Agendamentos
 - Data (string, obrigatório, formato: YYYY-MM-DD)
 - Hora (string, obrigatório, formato: HH:mm)
 
-Banco de dados SQLite localizado em: agendamentos.db
+Banco de dados PostgreSQL localizado em: agendamentos.db
+
+## Configuração do banco de dados
+- No arquivo appsetings.json, a linha nº 3 ( "DefaultConnection": "Server=localhost;Port=5432;Database=agendamentos;Username=postgres;Password=coloquesuasenha"), fique atento ao mudar o campo "Password", para colocar a mesma senha que você usa em seu banco de dados na máquina local!
 
 ## Configuração de CORS
 
