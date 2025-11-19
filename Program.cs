@@ -9,7 +9,6 @@ using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
-
 builder.Host.UseSerilog((context, config) =>
 {
     config
@@ -19,39 +18,32 @@ builder.Host.UseSerilog((context, config) =>
         .WriteTo.File("logs/log-.txt", rollingInterval: RollingInterval.Day);
 });
 
-
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8081";
-builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
-
-
-var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
-var connectionString = !string.IsNullOrEmpty(databaseUrl)
-    ? databaseUrl
-    : builder.Configuration.GetConnectionString("DefaultConnection");
+builder.WebHost.UseUrls($"http://*:{port}");
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(
-        connectionString,
+        builder.Configuration.GetConnectionString("DefaultConnection"),
         npgsqlOptions => npgsqlOptions.EnableRetryOnFailure(
             maxRetryCount: 5,
             maxRetryDelay: TimeSpan.FromSeconds(30),
             errorCodesToAdd: null)));
 
 builder.Services.AddControllers();
+
+
 builder.Services.AddValidatorsFromAssemblyContaining<RegistrarAgendamentoValidator>();
+
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?? new[] { "http://localhost:3000" };
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowFrontend", policy =>
-        policy.WithOrigins(
-                "http://localhost:3000",                     
-                "https://agendamentos-app-nu.vercel.app",   
-                "https://*.vercel.app"                       
-            )
-              .SetIsOriginAllowedToAllowWildcardSubdomains() 
+    options.AddPolicy("ApiCorsPolicy", policy =>
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials());
@@ -83,19 +75,20 @@ builder.Services.AddSwaggerGen(options =>
 var app = builder.Build();
 
 app.UseSerilogRequestLogging();
+
 app.UseExceptionHandler();
 
-
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+if (app.Environment.IsDevelopment())
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "API de Agendamentos v1");
-    c.RoutePrefix = "swagger"; 
-});
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "API de Agendamentos v1");
+        c.RoutePrefix = string.Empty;
+    });
+}
 
-
-app.UseCors("AllowFrontend");
-
+app.UseCors("ApiCorsPolicy");
 
 if (!app.Environment.IsProduction())
 {
@@ -105,18 +98,12 @@ if (!app.Environment.IsProduction())
 app.UseAuthorization();
 app.MapControllers();
 
-
-using (var scope = app.Services.CreateScope())
+if (app.Environment.IsDevelopment())
 {
-    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    try
+    using (var scope = app.Services.CreateScope())
     {
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await dbContext.Database.MigrateAsync();
-        Console.WriteLine("✅ Migrations aplicadas com sucesso!");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"❌ Erro ao aplicar migrations: {ex.Message}");
     }
 }
 
